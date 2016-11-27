@@ -1,0 +1,31 @@
+caffe: command line brew
+usage: caffe <command> <args>
+
+commands:
+  train           train or finetune a model
+  test            score a model
+  device_query    show GPU diagnostic information
+  time            benchmark model execution time
+
+  Flags from tools/caffe.cpp:
+    -gpu (Optional; run in GPU mode on given device IDs separated by ','.Use
+      '-gpu all' to run on all available GPUs. The effective training batch
+      size is multiplied by the number of devices.) type: string default: ""
+      currently: "0"
+    -iterations (The number of iterations to run.) type: int32 default: 50
+      currently: 100
+    -model (The model definition protocol buffer text file.) type: string
+      default: ""
+      currently: "./examples/cifar10_practice/cifar10_wino_train_test.prototxt"
+    -sighup_effect (Optional; action to take when a SIGHUP signal is received:
+      snapshot, stop or none.) type: string default: "snapshot"
+    -sigint_effect (Optional; action to take when a SIGINT signal is received:
+      snapshot, stop or none.) type: string default: "stop"
+    -snapshot (Optional; the snapshot solver state to resume training.)
+      type: string default: ""
+    -solver (The solver definition protocol buffer text file.) type: string
+      default: ""
+    -weights (Optional; the pretrained weights to initialize finetuning,
+      separated by ','. Cannot be set simultaneously with snapshot.)
+      type: string default: ""
+      currently: "./examples/cifar10_practice/cifar10_origin_iter_50000.caffemodel.h5"
