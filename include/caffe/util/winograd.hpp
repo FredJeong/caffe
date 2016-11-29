@@ -12,7 +12,7 @@ void winoWeight_gpu(const int num_inputs, const int num_outputs,
 template <typename Dtype>
 void padSrc_gpu(const int batchs, const int num_inputs, const int height, const int width, 
 				const int height_pad, const int width_pad,
-				const Dtype *input, Dtype *input_pad); 
+				const Dtype *input, Dtype *input_pad, const int c_height, const int c_width);
 
 
 template <typename Dtype>
@@ -29,7 +29,9 @@ template <typename Dtype>
 void winoDst_gpu(const int batchs, const int num_outputs, const int tileH, const int tileW, const int height, const int width,
 				 Dtype *m_matrix, Dtype *output, const int wino_tile_size); 
 
-
+template <typename Dtype>
+void trimDst_gpu(const int batchs, const int num_outputs, const int c_height, const int c_width,
+        const int height, const int width, const Dtype *output_pad, Dtype *output);
 
 
 } // namespace caffe 

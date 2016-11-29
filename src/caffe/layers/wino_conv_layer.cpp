@@ -46,7 +46,7 @@ void WinoConvolutionLayer<Dtype>::Reshape(
 	bottom_offset_ = this->bottom_dim_ / this->group_;
 	top_offset_ = this->top_dim_ / this->group_;
   
-  	const int batchs = 1; // this->num_; 
+  const int batchs = 1; // this->num_; 
 	const int num_inputs = this->channels_; 
 	const int num_outputs = this->num_output_ ; 
 	
@@ -57,20 +57,27 @@ void WinoConvolutionLayer<Dtype>::Reshape(
 	const int height_out = this->output_shape_[0]; 
 	const int width_out = this->output_shape_[1];
 
-	int tileW = (width_out + wino_tile_ - 1 ) / wino_tile_; 
-	int tileH = (height_out + wino_tile_ -1 ) / wino_tile_;
-	
-	std::vector<int> shape_temp(1);
-	shape_temp[0] = batchs * num_inputs * (height + height_pad * 2) * (width + width_pad * 2);
-	p_blob.Reshape(shape_temp);
-	//printf("p_shape %d\n", shape_temp[0]);
-	shape_temp[0] = batchs * num_inputs * tileH * tileW * (wino_tile_ + 2) * (wino_tile_ + 2);
-	v_blob.Reshape(shape_temp);
-	//printf("v_shape %d\n", shape_temp[0]);
-	shape_temp[0] = batchs * num_outputs * tileH * tileW * (wino_tile_ + 2) * (wino_tile_ + 2);
-	m_blob.Reshape(shape_temp);
-	//printf("m_shape %d\n", shape_temp[0]);
-	wino_weight_offset_ = num_inputs * num_outputs * (wino_tile_ + 2) * (wino_tile_ + 2); 
+  //[height,width] = [height,width]_out, since there is no stride
+  int wino_tile_real = wino_tile_ % 10;
+  int tileW = (width_out + wino_tile_real - 1 ) / wino_tile_real; 
+  int tileH = (height_out + wino_tile_real -1 ) / wino_tile_real;
+  
+  //std::cout << "HI WI HO WO " << height << " " << width << " " << height_out << " " << width_out << "\n";  
+
+  std::vector<int> shape_temp(1);
+  shape_temp[0] = batchs * num_inputs * (tileH * wino_tile_real + 2) * (tileW * wino_tile_real + 2);
+  p_blob.Reshape(shape_temp);
+//  std::cout << "p_blob size: " << shape_temp[0] << " ";
+  shape_temp[0] = batchs * num_inputs * tileH * tileW * (wino_tile_real + 2) * (wino_tile_real + 2);
+  v_blob.Reshape(shape_temp);
+//  std::cout << "v_blob size: " << shape_temp[0] << " ";
+  shape_temp[0] = batchs * num_outputs * tileH * tileW * (wino_tile_real + 2) * (wino_tile_real + 2);
+  m_blob.Reshape(shape_temp);
+//  std::cout << "m_blob size: " << shape_temp[0] << " ";
+  shape_temp[0] = batchs * num_outputs * tileH * tileW * wino_tile_real * wino_tile_real;
+  o_blob.Reshape(shape_temp);
+//  std::cout << "o_blob size: " << shape_temp[0] << "\n";
+  wino_weight_offset_ = num_inputs * num_outputs * (wino_tile_real + 2) * (wino_tile_real + 2);
 
 
 	const Dtype* weight = this->blobs_[0]->gpu_data(); //   + g * this->weight_offset_ ;
@@ -168,17 +175,70 @@ void WinoConvolutionLayer<Dtype>::forward_gpu_wino(const Dtype* input,
 	const int height_out = this->output_shape_[0]; 
 	const int width_out = this->output_shape_[1];
 
-	int tileW = (width_out + wino_tile_ - 1 ) / wino_tile_; 
-	int tileH = (height_out + wino_tile_ -1 ) / wino_tile_;
+  int wino_tile_real = wino_tile_ % 10;
+	int tileW = (width_out + wino_tile_real - 1 ) / wino_tile_real; 
+	int tileH = (height_out + wino_tile_real -1 ) / wino_tile_real;
+  
+  int c_width = tileW * wino_tile_real + 2;
+  int c_height = tileH * wino_tile_real + 2;
 
 	Dtype* p_matrix = p_blob.mutable_gpu_data();
 	Dtype* v_matrix = v_blob.mutable_gpu_data();
 	Dtype* m_matrix = m_blob.mutable_gpu_data(); 
-	
-	padSrc_gpu(batchs, num_inputs, height, width, height_pad, width_pad, input, p_matrix); 
-	winoSrc_gpu(batchs, num_inputs, tileH, tileW, height + height_pad *2, width + width_pad * 2, p_matrix, v_matrix, wino_tile_); 
+	Dtype* o_matrix = o_blob.mutable_gpu_data();
+
+
+	padSrc_gpu(batchs, num_inputs, height, width, height_pad, width_pad, input, p_matrix, c_width, c_height);
+/*  std::cout << "p matrix\n";
+  const Dtype *p_cpu = p_blob.cpu_data();
+  for (int i = 0; i < c_height; i++) {
+    for (int j = 0; j < c_width; j++) {
+      std::cout << p_cpu[i*c_width + j] << " ";
+    }
+    std::cout << "\n";
+  }*/
+	winoSrc_gpu(batchs, num_inputs, tileH, tileW, c_height, c_width, p_matrix, v_matrix, wino_tile_); 
+/*  std::cout << "v matrix\n";
+  const Dtype *v_cpu = v_blob.cpu_data();
+  for (int i = 0; i < wino_tile_real+2; i++) {
+    for (int j = 0; j < wino_tile_real+2; j++) {
+      std::cout << v_cpu[i*(wino_tile_real+2) + j] << " ";
+    }
+    std::cout << "\n";
+  }*/
 	winoMulti_gpu(batchs, num_inputs, num_outputs, tileH, tileW, u_matrix, v_matrix, m_matrix, wino_tile_); 
-	winoDst_gpu(batchs, num_outputs, tileH, tileW, height_out, width_out, m_matrix, output, wino_tile_); 
+/*  std::cout << "u matrix\n";
+  const Dtype *u_cpu = wino_blob.cpu_data();
+  for (int i = 0; i < 3; i++) {
+    for (int j = 0; j < 3; j++) {
+      std::cout << u_cpu[i*3 + j] << " ";
+    }
+    std::cout << "\n";
+  }
+  std::cout << "m matrix\n";
+  const Dtype *m_cpu = m_blob.cpu_data();
+  for (int i = 0; i < wino_tile_real+2; i++) {
+    for (int j = 0; j < wino_tile_real+2; j++) {
+      std::cout << m_cpu[i*(wino_tile_real+2) + j] << " ";
+    }
+    std::cout << "\n";
+  }*/
+	winoDst_gpu(batchs, num_outputs, tileH, tileW, c_height - 2, c_width - 2, m_matrix, o_matrix, wino_tile_);
+  /*std::cout << "o matrix\n";
+  const Dtype *o_cpu = o_blob.cpu_data();
+  for (int i = 0; i < c_height - 2; i++) {
+    for (int j = 0; j < c_width - 2; j++) {
+      std::cout << o_cpu[i*(c_height-2) + j] << " ";
+    }
+    std::cout << "\n";
+  }*/
+  trimDst_gpu(batchs, num_outputs, c_height-2, c_width-2, height, width, o_matrix, output); 
+  /*for (int i = 0; i < height_out; i++) {
+    for (int j = 0; j < width_out; j++) {
+      std::cout << output[i*width_out + j] << " ";
+    }
+    std::cout << "\n";
+  }*/
 }
 
 

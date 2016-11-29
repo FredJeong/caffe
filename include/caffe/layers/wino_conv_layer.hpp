@@ -101,7 +101,7 @@ class WinoConvolutionLayer : public BaseConvolutionLayer<Dtype> {
 	Blob<Dtype> p_blob;
 	Blob<Dtype> v_blob;
 	Blob<Dtype> m_blob;
-
+  Blob<Dtype> o_blob;
 
 };
 
