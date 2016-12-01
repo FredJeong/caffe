@@ -23,10 +23,10 @@ void WinoConvolutionLayer<Dtype>::LayerSetUp(
 	wino_shape[3] = this->channels_ ; //  / this->group_; 
   
   //for (int i = 0; i < 4; i++) printf("wino_shape[%d] %d\n", i, wino_shape[i]);
-
+  initDone=0;
 
 	wino_blob.Reshape(wino_shape);     
-
+/*
 	const int num_inputs = this->channels_; 
 	const int num_outputs = this->num_output_ ; 
 	
@@ -34,7 +34,7 @@ void WinoConvolutionLayer<Dtype>::LayerSetUp(
 	Dtype* wino_weight = wino_blob.mutable_gpu_data(); //   + g * this->wino_weight_offset_  ; 
 
 	winoWeight_gpu(num_inputs, num_outputs, weight, wino_weight, wino_tile_); 
-
+*/
 }
 
 
@@ -79,11 +79,14 @@ void WinoConvolutionLayer<Dtype>::Reshape(
 //  std::cout << "o_blob size: " << shape_temp[0] << "\n";
   wino_weight_offset_ = num_inputs * num_outputs * (wino_tile_real + 2) * (wino_tile_real + 2);
 
+  if(initDone < 2) {
+    std::cout<<"initializing weights\n";
+    initDone++;
+  	const Dtype* weight = this->blobs_[0]->gpu_data(); //   + g * this->weight_offset_ ;
+	  Dtype* wino_weight = wino_blob.mutable_gpu_data(); //   + g * this->wino_weight_offset_  ; 
 
-	const Dtype* weight = this->blobs_[0]->gpu_data(); //   + g * this->weight_offset_ ;
-	Dtype* wino_weight = wino_blob.mutable_gpu_data(); //   + g * this->wino_weight_offset_  ; 
-
-	winoWeight_gpu(num_inputs, num_outputs, weight, wino_weight, wino_tile_); 
+  	winoWeight_gpu(num_inputs, num_outputs, weight, wino_weight, wino_tile_); 
+  }
 
 
 }

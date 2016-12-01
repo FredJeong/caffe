@@ -96,6 +96,8 @@ class WinoConvolutionLayer : public BaseConvolutionLayer<Dtype> {
 	int tileW, tileH;	
 	int bottom_offset_, top_offset_, bias_offset_, wino_weight_offset_;
 
+  int  initDone;
+
 	Blob<Dtype> wino_blob; 
 	
 	Blob<Dtype> p_blob;
