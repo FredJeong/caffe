@@ -13,7 +13,7 @@ void WinoConvolutionLayer<Dtype>::LayerSetUp(
   BaseConvolutionLayer<Dtype>::LayerSetUp(bottom, top);
 
  // LENA
-	wino_tile_ = this->layer_param_.convolution_param().wino_tile(); // base = 2/4/6  , AddOpt = 12/14/16
+	wino_tile_ = this->layer_param_.convolution_param().wino_tile() % 10; // base = 2/4/6  , AddOpt = 12/14/16
 	wino_zero_idx_ = this->layer_param_.convolution_param().wino_zero_idx(); // base = 2/4/6  , AddOpt = 12/14/16
 
 	vector<int> wino_shape(4);

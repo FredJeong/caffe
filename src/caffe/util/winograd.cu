@@ -5,6 +5,9 @@
 #include "caffe/util/winograd.hpp"
 #include "caffe/util/math_functions.hpp"
 
+#define NUM_THREADS 32
+#define WINO6_TH 256
+
 namespace caffe{
 
 template <typename Dtype> 
@@ -689,8 +692,41 @@ __global__ void wino6x6SrcAddOpt_gpu_kernel(const Dtype *src, Dtype *dst, int da
 
 
 template <typename Dtype> 
-__global__ void winoMulti_gpu_kernel(const Dtype *A, const Dtype *B, Dtype *C, int Ah, int Bw, int Aw, const float alpha, const float beta)
+__global__ void winoMulti_gpu_kernel(const Dtype *u_matrix, const Dtype *v_matrix, Dtype *m_matrix,
+                                    const int Ah, const int Bw, const int Aw, const float alpha, const float beta)
 {
+   const Dtype *A = u_matrix + blockIdx.z * Ah * Aw;
+   const Dtype *B = v_matrix + blockIdx.z * Aw * Bw;
+   Dtype *C = m_matrix + blockIdx.z * Ah * Bw;
+
+   int col = blockIdx.x * NUM_THREADS + threadIdx.x;
+   int row = blockIdx.y * NUM_THREADS + threadIdx.y;
+   __shared__ float As[NUM_THREADS][NUM_THREADS];
+   __shared__ float Bs[NUM_THREADS][NUM_THREADS];
+
+   float acc = 0.0;
+   for (int i = 0; i <= (Aw-1) / NUM_THREADS+1; i++) {
+     int tr = row;
+     int tc = i * NUM_THREADS + threadIdx.x;
+     if (tr < Ah && tc < Aw)
+         As[threadIdx.y][threadIdx.x] = A[row * Aw + i * NUM_THREADS + threadIdx.x];
+     else
+         As[threadIdx.y][threadIdx.x] = 0.0;
+     tr = i * NUM_THREADS + threadIdx.y;
+     tc = col;
+     if (tr < Aw && tc < Bw)
+       Bs[threadIdx.y][threadIdx.x] = B[(i * NUM_THREADS + threadIdx.y) * Bw + col];
+     else
+       Bs[threadIdx.y][threadIdx.x] = 0.0;
+     __syncthreads();
+ //#pragma unroll
+     for (int k = 0; k < NUM_THREADS && i * NUM_THREADS + k < Aw; k++)
+       acc += As[threadIdx.y][k] * Bs[k][threadIdx.x];
+     __syncthreads();
+   }
+   if (row >= Ah || col >= Bw) return;
+   C[row * Bw + col] = acc;
+  /*
 	int bx = blockIdx.x;
 	int by = blockIdx.y; 
 	int bz = blockIdx.z; 
@@ -738,7 +774,7 @@ __global__ void winoMulti_gpu_kernel(const Dtype *A, const Dtype *B, Dtype *C, i
 
 	if((cW < Bw) && (cH < Ah))   
 		C[bz * Bw * Ah + Bw * cH + cW] = Csub; 
-
+*/
 }
 
 
@@ -1083,14 +1119,14 @@ void winoMulti_gpu(const int batchs, const int num_inputs, const int num_outputs
 {
 
 	int batched = (wino_tile_size + 2) * (wino_tile_size + 2); 
-
-
-	for(int i = 0; i < batched; i++)
-	{
-		caffe_gpu_gemm<Dtype>(CblasNoTrans, CblasNoTrans, num_outputs, batchs*tileH*tileW, num_inputs, (Dtype)1., u_matrix + i * num_inputs * num_outputs , v_matrix + i * tileH * tileW * num_inputs * batchs, (Dtype)0., m_matrix + i * batchs * num_outputs * tileH * tileW); 
-	}
-
-
+  //std::cout << "Matrix size (M x N) (N x K) M N K :" << num_outputs << " " << num_inputs << " "  << batchs*tileH*tileW << "\n";
+  int M = num_outputs;
+  int N = batchs*tileH*tileW;
+  int K = num_inputs;
+  dim3 gridSize((N-1)/NUM_THREADS+1, (M-1)/NUM_THREADS+1, batched);
+  dim3 blockSize(NUM_THREADS, NUM_THREADS, 1);
+//  std::cout << "Grid Size: " << (N-1)/NUM_THREADS + 1 << " " << (M-1)/NUM_THREADS+1 << " " << batched << "\n";
+  winoMulti_gpu_kernel<Dtype><<<gridSize, blockSize>>> (u_matrix, v_matrix, m_matrix, M, N, K, 1.0, 0.0);
 }
 
 template void winoMulti_gpu<float>(const int batchs, const int num_inputs, const int num_outputs, const int tileH, const int tileW, 
