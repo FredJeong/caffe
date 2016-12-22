@@ -8,6 +8,9 @@
 #define NUM_THREADS 32
 #define WINO6_TH 256
 
+#define SSRC(i,j) src[sIdx+dataW*(i)+(j)]
+#define DSRC(i) src[mIdx+gap*(i)]
+
 namespace caffe{
 
 template <typename Dtype> 
@@ -659,11 +662,64 @@ __global__ void wino4x4SrcAddOpt_gpu_kernel(const Dtype *src, Dtype *dst, int da
 		int xIdx = idx % tileW;
 
 		int bIdx =  idx % gap;
-		int sIdx = batchIdx * inputs * dataW * dataH + inputIdx * dataW * dataH + yIdx * dataW * 2 + xIdx * 2;
+		int sIdx = batchIdx * inputs * dataW * dataH + inputIdx * dataW * dataH + yIdx * dataW * 4 + xIdx * 4;
 
 
 		//// -- project ---- ///
+float a[30];
+#pragma unroll
+for (int i = 0; i < 30; i++) a[i] = SSRC(i/6, i%6);
 
+dst[bIdx +  0  * gap] =  16*(a[0]-a[2]-a[12]) + 4*(a[4]+a[24]-a[2]-a[12]) + 25*a[14] - 5*(a[16]+a[26]) + a[28];
+dst[bIdx +  1  * gap] =  16*(-a[1]-a[2]-a[13]-a[14]) + 4*(a[3]+a[4]+a[13]+a[14]-a[25]-a[26]) - 5*(a[15] + a[16]) + a[27] + a[28] ;
+dst[bIdx +  2  * gap] =  16*(a[1]-a[2]-a[13]+a[14]) + 4*(-a[3]+a[4]-a[13]+a[14]+a[25]-a[26]) + 5*(a[15]-a[16])  - a[27] + a[28] ;
+dst[bIdx +  3  * gap] =  8*(-a[1]+a[3]+a[13]-a[15]) + 4*(-a[2]+a[4]) + 5*(a[14]-a[16]) - 2*(a[25]+a[27]-a[13]+a[15]) - a[26] + a[28] ;
+dst[bIdx +  4  * gap] =  8*(a[1]-a[3]-a[13]+a[15]) + 4*(-a[2] + 4*a[4]) + 5*(a[14]-a[16]) + 2*(a[25]-a[27]-a[13]+a[15]) - a[26] + a[28] ;
+dst[bIdx +  5  * gap] =  16*(a[1]-a[3]-a[13]) + 4*(a[5]-a[3]-a[13]+a[25]) + 25*a[15] - 5*(a[17] +a[27]) + a[29] ;
+
+//P6
+dst[bIdx +  11  * gap] =  16*(-a[7]+a[9]-a[13]+a[15]) + 4*(-a[17]+a[9]-a[11]+a[15]+a[19]+a[25]-a[21]-a[27]) - a[21]-a[27] + a[23] + a[29] ;
+dst[bIdx +  17  * gap] =  16*(a[7]-a[9]-a[13]+a[15]) + 4*(a[11]-a[9]+a[15]-a[17]-a[19]+a[25]+a[21]-a[27]) + a[21]-a[27] - a[23] - a[29] ;
+dst[bIdx +  23  * gap] =  8*(-a[7]+a[19]+a[9]-a[21]) + 2*(-a[11]+a[9]-a[21]+a[23]) + 4*(-a[13]+a[25]+a[15]-a[27]) + a[15]-a[27] - a[17] + a[29] ;
+dst[bIdx +  29  * gap] =  8*(a[7]-a[9]-a[19]+a[21]) + 2*(a[11]-a[9]+a[21]-a[23]) + 4*(-a[13]+a[25]+a[15]-a[27]) + a[15]-a[27] - a[17] + a[29] ;
+
+
+dst[bIdx +  7  * gap] =  16*(a[7]+a[8]+a[13]+a[14]) - 4*(a[9]-a[10]-a[15]-a[16]-a[19]-a[20]-a[25]-a[26]) + a[21] + a[22] + a[27] + a[28] ;
+dst[bIdx +  8  * gap] =  16*(-a[7]+a[8]-a[13]+a[14]) + 4*(a[9]-a[10]+a[15]-a[16]+a[19]-a[20]+a[25]-a[26]) - a[21] + a[22] - a[27] + a[28] ;
+dst[bIdx +  9  * gap] =  8*(a[7]-a[9]+a[13]-a[15]) + 4*(a[8]-a[10]+a[14]-a[16]) + 2*(-a[19]+a[21]-a[25]+a[27]) - a[20]  + a[22]  - a[26] + a[28] ;
+dst[bIdx +  10  * gap] =  8*(-a[7]+a[9]-a[13]+a[15]) + 4*(a[8]-a[10]+a[14]-a[16]) + 2*(a[19]-a[21]+a[25]-a[27]) - a[20] + a[22] - a[26] + a[28] ;
+
+
+dst[bIdx +  13  * gap] =  16*(-a[7]-a[8]+a[13]+a[14]) + 4*(a[9]+a[10]-a[15]-a[16]+a[19]+a[20]-a[25]-a[26]) - a[21] - a[22] + a[27] + a[28] ;
+dst[bIdx +  14  * gap] =  16*(a[7]-a[8]-a[13]+a[14]) -4*(a[9]+a[10]+a[15]-a[16]-a[19]+a[20]+a[25]-a[26]) + a[21] - a[22] - a[27] + a[28] ;
+dst[bIdx +  15  * gap] =  8*(-a[7]+a[9]+a[13]-a[15]) + 4*(-a[8]+a[10]+a[14]-a[16]) + 2*(a[19]-a[21]+a[25]+a[27]) + a[20] - a[22] - a[26] + a[28] ;
+dst[bIdx +  16  * gap] =  8*(a[7]-a[9]-a[13]+a[15]) + 4*(a[8]+a[10]+a[14]-a[16]) + 2*(-a[19]+a[21]+a[25]-a[27]) + a[20] - a[22] - a[26] + a[28] ;
+
+dst[bIdx +  19  * gap] =  8*(a[7]+a[8]-a[19]-a[20]) + 2*(-a[9]-a[10]+a[21]+a[22]) + 4*(a[13]+a[14]-a[25]-a[26]) - a[15] - a[16] + a[27] + a[28] ;
+dst[bIdx +  20  * gap] =  8*(-a[7]+a[8]+a[19]-a[20]) + 2*(a[9]-a[10]-a[21]+a[22]) + 4*(-a[13]+a[14]+a[25]-a[26]) + a[15] - a[16] - a[27] + a[28] ;
+dst[bIdx +  21  * gap] =  4*(a[7]-a[9]-a[19]+a[21]) + 2*(a[8]-a[10]+a[13]-a[15]-a[20]+a[22]-a[25]+a[27]) + a[14] - a[16] - a[26] + a[28] ;
+dst[bIdx +  22  * gap] =  4*(-a[7]+a[9]+a[19]-a[21]) + 2*(a[8]-a[10]-a[13]+a[15]-a[20]+a[22]+a[25]-a[27]) + a[14] - a[16] - a[26] + a[28] ;
+
+dst[bIdx +  25  * gap] =  8*(-a[7]-a[8]+a[19]+a[20]) + 2*(a[9]+a[10]-a[21]-a[22]) + 4*(a[13]+a[14]-a[25]-a[26]) - a[15] - a[16] + a[27] + a[28] ;
+dst[bIdx +  26  * gap] =  8*(a[7]-a[8]-a[19]+a[20]) + 2*(-a[9]+a[10]+a[21]-a[22]) + 4*(-a[13]+a[14]+a[25]-a[26]) + a[15] - a[16] - a[27] + a[28] ;
+dst[bIdx +  27  * gap] =  4*(-a[7]+a[9]+a[19]-a[21]) + 2*(-a[8]+a[10]+a[13]-a[15]+a[20]-a[22]-a[25]+a[27]) + a[14] - a[16] - a[26] + a[28] ;
+dst[bIdx +  28  * gap] =  4*(a[7]-a[9]-a[19]+a[21]) + 2*(-a[8]+a[10]-a[13]+a[15]+a[20]-a[22]+a[25]-a[27]) + a[14] - a[16] - a[26] + a[28] ;
+
+//P4
+dst[bIdx +  6  * gap] =  16*(-a[6]+a[8]-a[12]+a[14]) + 4*(-a[10]+a[8]+a[14]-a[16]+a[18]+a[24]) - 5*(a[20]+a[26]) + a[22] + a[28] ;
+dst[bIdx +  12  * gap] =  16*(a[6]-a[8]-a[12]+a[14]) + 4*(a[10]-a[8]+a[14]-a[16]-a[18]+a[24]) + 5*(a[20]-a[26]) - a[22] + a[28] ;
+dst[bIdx +  18  * gap] =  8*(-a[6]+a[8]+a[18]-a[20]) + 2*(-a[10]+a[8]-a[20]+a[22]) + 4*(-a[12]+a[24]) + 5*(a[14]-a[26]) - a[16] + a[28] ;
+dst[bIdx +  24  * gap] =  8*(a[6]-a[8]-a[18]+a[20]) +  2*(a[10]-a[8]+a[20]-a[22]) + 4*(-a[12]+a[24]) + 5*(a[14]-a[26]) - a[16] + a[28] ;
+
+#pragma unroll
+for (int i = 0;i<6;i++) a[i] = SSRC(5,i);
+
+dst[bIdx +  30  * gap] =  16*(a[6]-a[8]-a[18]) + 4*(a[10]-a[8]-a[18]+a[0]-a[22]-a[2])  + 25*a[20] - a[22] - a[2] + a[4] ;
+dst[bIdx +  31  * gap] =  16*(-a[7]-a[8]+a[19]+a[20]) + 4*(a[9]+a[10]+a[19]+a[20]-a[21]-a[22]-a[1]-a[2]) -a[21]-a[22] + a[3] + a[4] ;
+dst[bIdx +  32  * gap] =  16*(a[7]-a[8]-a[19]+a[20]) + 4*(-a[9]+a[10]-a[19]+a[20]+a[21]-a[22]+a[1]-a[2]) + a[21] - a[22] - a[3] + a[4] ;
+dst[bIdx +  33  * gap] =  8*(-a[7]+a[9]+a[19]-a[21]) + 4*(-a[8]+a[10]+a[20]-a[22]) +a[20] - a[22] + 2*(-a[1]+a[19]-a[21]+a[3]) - a[2] + a[4] ;
+dst[bIdx +  34  * gap] =  8*(a[7]-a[9]-a[19]+a[21]) + 4*(-a[8]+a[10]+a[20]-a[22]) + a[20] - a[22] + 2*(a[1]-a[19]+a[21]-a[3]) - a[2] + a[4] ;
+dst[bIdx +  35  * gap] =  16*(a[7]-a[9]-a[19]) + 4*(a[11]-a[9]-a[19]+a[1]) + 25*a[21] - 5*(a[23]+a[3]) + a[5] ;	
 	}
 }
 
@@ -985,12 +1041,103 @@ __global__ void wino4x4DstAddOpt_gpu_kernel(const Dtype *src, Dtype * dst, const
 		int yIdx = (idx % (tileW * tileH)) / tileW;
 		int xIdx = idx % tileW;
 
-		int rIdx = highIdx * outW * outH + yIdx * outW * 2 + xIdx * 2;
+		int rIdx = highIdx * outW * outH + yIdx * outW * 4 + xIdx * 4;
 		int mIdx = (idx % tNums); 
 		int gap = batchs * outputs * tileH * tileW;
 
 
 		//// -- project ---- ///
+
+float s[20], a[8];
+
+
+a[0] = DSRC(7);
+a[1] = DSRC(8);
+a[2] = DSRC(9);
+a[3] = DSRC(10);
+a[4] = DSRC(13);
+a[5] = DSRC(14);
+a[6] = DSRC(15);
+a[7] = DSRC(16);
+
+s[0]  = a[0] + a[4];
+s[8]  = a[0] - a[4];
+s[1]  = a[1] + a[5];
+s[9]  = a[1] - a[5];
+s[2]  = a[2] + a[6];
+s[10] = a[2] - a[6];
+s[3]  = a[3] + a[7];
+s[11] = a[3] - a[7];
+
+a[0] = DSRC(19);
+a[1] = DSRC(20);
+a[2] = DSRC(21);
+a[3] = DSRC(22);
+a[4] = DSRC(25);
+a[5] = DSRC(26);
+a[6] = DSRC(27);
+a[7] = DSRC(28);
+
+s[4]  = a[0] + a[4];
+s[12] = a[0] - a[4];
+s[5]  = a[1] + a[5];
+s[13] = a[1] - a[5];
+s[6]  = a[2] + a[6];
+s[14] = a[2] - a[6];
+s[7]  = a[3] + a[7];
+s[15] = a[3] - a[7];
+
+a[0] = DSRC(1) + s[0] + s[4];
+a[1] = DSRC(2) + s[1] + s[5];
+a[2] = DSRC(3) + s[2] + s[6];
+a[3] = DSRC(4) + s[3] + s[7];
+
+dst[rIdx + outW * 0 + 0]  =  DSRC(0) + DSRC(6) + DSRC(12) + DSRC(18) + DSRC(24) + a[0] + a[1] + a[2] + a[3];
+dst[rIdx + outW * 0 + 1]  =  a[0] - a[1] + 2*(a[2] - a[3]);
+dst[rIdx + outW * 0 + 2]  =  a[0] + a[1] + 4*(a[2] + a[3]);
+
+s[16] = DSRC(11);
+s[17] = DSRC(17);
+s[18] = DSRC(23);
+s[19] = DSRC(29);
+dst[rIdx + outW * 0 + 3]  =  DSRC(5) + s[16] + s[17] + s[18] + s[19] + a[0] - a[1] + 8*(a[2] - a[3]);
+
+a[0] =  s[8] + 2*(s[12]);
+a[1] =  s[9] + 2*(s[13]);
+a[2] = s[10] + 2*(s[14]);
+a[3] = s[11] + 2*(s[15]);
+
+a[4] = s[0] + 4*(s[4]);
+a[5] = s[1] + 4*(s[5]);
+a[6] = s[2] + 4*(s[6]);
+a[7] = s[3] + 4*(s[7]);
+
+dst[rIdx + outW * 1 + 3]  = s[16] - s[17] + 2*(s[18] - s[19]) + a[0] - a[1] + 8*(a[2] - a[3]);
+dst[rIdx + outW * 2 + 3]  = s[16] + s[17] + 4*(s[18] + s[19]) + a[4] - a[5] + 8*(a[6] - a[7]);
+
+dst[rIdx + outW * 1 + 1]  = a[0] - a[1] + 2*(a[2] - a[3]);
+dst[rIdx + outW * 1 + 2]  = a[0] + a[1] + 4*(a[2] + a[3]);
+
+dst[rIdx + outW * 2 + 1]  = a[4] - a[5] + 2*(a[6] - a[7]);
+dst[rIdx + outW * 2 + 2]  = a[4] + a[5] + 4*(a[6] + a[7]);
+
+s[16] = DSRC(6);
+s[17] = DSRC(12);
+s[18] = DSRC(18);
+s[19] = DSRC(24);
+
+dst[rIdx + outW * 1 + 0]  =  s[16] - s[17] + 2*(s[18] - s[19]) + a[0] + a[1] + a[2] + a[3];
+dst[rIdx + outW * 2 + 0]  =  s[16] + s[17] + 4*(s[18] + s[19]) + a[4] + a[5] + a[6] + a[7];
+
+a[0] = s[8] + 8*s[12] + DSRC(31);
+a[1] = s[9] + 8*s[13] + DSRC(32);
+a[2] = s[10] + 8*s[14] + DSRC(33);
+a[3] = s[11] + 8*s[15] + DSRC(34);
+
+dst[rIdx + outW * 3 + 0]  =  s[16] - s[17] + 8*(s[18] - s[19]) + DSRC(30) + a[0] + a[1] + a[2] + a[3];
+dst[rIdx + outW * 3 + 1]  =  a[0] - a[1] + 2*(a[2] - a[3]);
+dst[rIdx + outW * 3 + 2]  =  a[0] + a[1] + 4*(a[2] + a[3]);
+dst[rIdx + outW * 3 + 3]  =  DSRC(11) - DSRC(17) + 8*DSRC(23) - 8*DSRC(29) + DSRC(35) + a[0] - a[1] + 8*(a[2] - a[3]);
 
 	}
 }
@@ -1031,8 +1178,8 @@ void winoWeight_gpu(const int num_inputs, const int num_outputs,
 		wino4x4Weight_gpu_kernel<Dtype><<<CAFFE_GET_BLOCKS(num_kernels),
 			                         CAFFE_CUDA_NUM_THREADS>>>(weight, wino_weight, num_inputs, num_outputs, num_kernels); 
 	else if((wino_tile_size == 6) || (wino_tile_size == 16))
-		wino6x6Weight_gpu_kernel<Dtype><<<(num_kernels + 127) / 128,
-			                         128>>>(weight, wino_weight, num_inputs, num_outputs, num_kernels); 
+		wino6x6Weight_gpu_kernel<Dtype><<<(num_kernels + WINO6_TH-1) / WINO6_TH,
+			                         WINO6_TH>>>(weight, wino_weight, num_inputs, num_outputs, num_kernels); 
 
 }
 
@@ -1094,8 +1241,8 @@ void winoSrc_gpu(const int batchs, const int num_inputs, const int tileH, const 
 	}
 	else if(wino_tile_size == 6)
 	{
-		wino6x6Src_gpu_kernel<Dtype><<<(num_kernels + 127) / 128,
-				                         128>>>(m_matrix, v_matrix, height, width,  tileH, tileW, num_inputs, batchs, num_kernels); 
+		wino6x6Src_gpu_kernel<Dtype><<<(num_kernels + WINO6_TH-1) / WINO6_TH,
+				                         WINO6_TH>>>(m_matrix, v_matrix, height, width,  tileH, tileW, num_inputs, batchs, num_kernels); 
 	}
 	else if(wino_tile_size == 16)
 	{
@@ -1166,8 +1313,8 @@ void winoDst_gpu(const int batchs, const int num_outputs, const int tileH, const
 	}
 	else if(wino_tile_size == 6)
 	{
-		wino6x6Dst_gpu_kernel<Dtype><<<(num_kernels + 127)/128,
-					                 128>>>(m_matrix, output, tileH, tileW, height, width, num_outputs, batchs, num_kernels); 
+		wino6x6Dst_gpu_kernel<Dtype><<<(num_kernels + WINO6_TH-1)/WINO6_TH,
+					                 WINO6_TH>>>(m_matrix, output, tileH, tileW, height, width, num_outputs, batchs, num_kernels); 
 	}
 	else if(wino_tile_size == 16)
 	{
